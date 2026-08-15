@@ -45,7 +45,7 @@ pnpm dsh plugin --profile web add ./time_line_mind/autoload
 2. 对话流出现 Cordis 审批卡片,点一次 **✓ 批准**(每次重启只需这一步,因为审批状态也在内存中);
 3. 刷新页面,从标题栏 **🧠 按钮** 打开编辑器;图档数据从工作区 `mindmap-docs.json` 自动读回。
 
-> 自动重载器只恢复**用户主会话**(跳过子代理会话),每个会话独立一份插件实例。卸载:`pnpm dsh plugin --profile web remove time-line-mind-autoload`。
+> 自动重载器是**进程级单实例**:整个 DSH 进程只恢复一个实例(挂在第一个出现的用户会话下),图档数据在 host 侧全局共享、UI 全局可用——不随会话数量重复。卸载:`pnpm dsh plugin --profile web remove time-line-mind-autoload`。
 
 ## 手动恢复(兜底)
 

@@ -1,6 +1,10 @@
 // time_line_mind 自动重载器 —— 模板。
 // 由 build.js 读取 ../src/host.js 与 ../src/client.js,替换占位符生成 index.js。
 // 本文件不直接运行;请勿手工编辑生成的 index.js。
+//
+// 策略:进程级单实例。整个 DSH 进程只恢复一个 time_line_mind 实例,
+// 挂在第一个出现的用户会话下(DSH 动态插件 API 强制实例归属某个会话,
+// 但数据在 host 侧按 'default' key 全局共享、UI 全局注册,行为等价于进程级)。
 
 const HOST_SOURCE = __HOST_SOURCE__
 const CLIENT_SOURCE = __CLIENT_SOURCE__
@@ -13,20 +17,20 @@ export const name = 'time-line-mind-autoload'
 
 export const inject = ['dynamicCordisRunner', 'agents']
 
-/** 已为本进程内某会话发起过恢复(防重复 define/run)。 */
-const restored = new Set()
+/** 进程级标志:本进程已恢复(或已存在)实例后,不再为任何会话恢复第二个。 */
+let restoredOnce = false
 
 async function restoreOnce(ctx, agent) {
+  if (restoredOnce) return
   const runner = ctx.get('dynamicCordisRunner')
   if (!runner || !agent || typeof agent.id !== 'string') return
-  if (restored.has(agent.id)) return
-  restored.add(agent.id)
 
-  // 本进程内已有该插件的定义(例如用户已手动加载)则跳过,避免生成重复插件。
+  // 本进程已存在该插件的定义(例如用户已手动加载)则标记并跳过,避免重复。
   try {
     const rows = runner.snapshot(agent)
     if (Array.isArray(rows) && rows.some((r) => r && typeof r.pluginId === 'string' && r.pluginId.startsWith(ID_PREFIX + '-'))) {
       console.log(`[time-line-mind-autoload] ${agent.id}: already defined, skip`)
+      restoredOnce = true
       return
     }
   } catch (err) {
@@ -43,9 +47,11 @@ async function restoreOnce(ctx, agent) {
       code: { host: HOST_SOURCE, client: CLIENT_SOURCE },
     })
   } catch (err) {
+    // define 失败不置位:允许后续会话重试。
     console.error(`[time-line-mind-autoload] ${agent.id}: define failed`, err)
     return
   }
+  restoredOnce = true
 
   try {
     const res = await runner.run(agent, receipt.pluginId, receipt.packageId, 'run')
@@ -76,18 +82,22 @@ export function apply(ctx) {
       return
     }
     if (!Array.isArray(list)) return
-    for (const agent of list) restoreFor(agent)
+    // 进程级单实例:只让第一个可用会话触发恢复,其余由 restoredOnce 短路。
+    for (const agent of list) {
+      restoreFor(agent)
+      if (restoredOnce) break
+    }
   }
 
   // 启动时已存在的会话(apply 前已创建)。
   sweep()
 
   // 之后创建/恢复的会话。session/created 是 scoped 事件,须 global 监听;
-  // 跳过子代理会话(parentSession 存在),只恢复用户主会话。
+  // 跳过子代理会话(parentSession 存在),只考虑用户会话。
   ctx.on(
     'session/created',
     (session) => {
-      if (!session || session.parentSession !== undefined) return
+      if (restoredOnce || !session || session.parentSession !== undefined) return
       const agent = agents.get(session.id)
       if (agent) {
         restoreFor(agent)

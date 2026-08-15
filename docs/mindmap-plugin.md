@@ -105,9 +105,9 @@ Client 半区(浏览器)
 1. **defineTool**:parameters.additionalProperties true/省略;output { schema, render };execute 在 defineTool 内;output.schema.additionalProperties 显式。
 2. **sidebar.footer.action 被 CordisPanel 独占**(width:100%;flex:none),入口放 `conversation.session.header.actions`。
 3. **动态插件定义进程内存级**:DSH 重启即丢定义,需重新 define+run;文档数据会从 `mindmap-docs.json` 恢复(若 fs 可用)。
-   - **自动恢复**:项目 `autoload/` 组合插件在 DSH 每次启动时为每个用户会话自动 `define+run` 本插件。安装:
+   - **自动恢复**:项目 `autoload/` 组合插件在 DSH 每次启动时自动 `define+run` 本插件,**进程级单实例**——整个进程只恢复一个实例(挂在第一个出现的用户会话下),不随会话数量重复;图档数据在 host 侧按 `'default'` key 全局共享。安装:
      `pnpm dsh plugin --profile web add ./time_line_mind/autoload`(需 dsh CLI 或源码 checkout)。
-   - 自动恢复的机制:`DynamicCordisRunnerService` 暴露编程式 `define({sessionId,...})` / `run(agent, ...)`;组合插件注入 `dynamicCordisRunner` + `agents`,apply 时扫现有会话并监听 `session/created`(须 `{ global: true }`,scoped 事件;跳过 `parentSession` 存在的子代理会话)。
+   - 自动恢复的机制:`DynamicCordisRunnerService` 暴露编程式 `define({sessionId,...})` / `run(agent, ...)`;组合插件注入 `dynamicCordisRunner` + `agents`,apply 时扫现有会话并监听 `session/created`(须 `{ global: true }`,scoped 事件;跳过 `parentSession` 存在的子代理会话;进程级 `restoredOnce` 标志保证只恢复一次)。
    - **审批**:新进程的新插件无授权记录,`run` 返回 `awaiting-approval`,用户需在对话流审批卡片点一次 ✓;审批状态亦在内存,每次重启都需这一步。
    - 重新生成内联源码:`node autoload/build.js`(从 src/host.js、src/client.js 生成 autoload/index.js)。
 4. **diagnostics**:`dynamicCordisRunner.snapshot(agent)` 必须传 agent(动态工具用 exec.agent)。
