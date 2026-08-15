@@ -27,6 +27,20 @@
 
 详细说明见 [`docs/mindmap-plugin.md`](docs/mindmap-plugin.md)。
 
+## 重启后恢复(重要)
+
+动态插件的**代码定义存在 DSH 进程内存**里,DSH 重启后定义会被清空——这是动态插件的设计特性,不是故障。**你的数据不会丢**:图档数据已落盘在工作区 `mindmap-docs.json`,重新加载插件后会自动读回。
+
+重启后恢复只需两步:
+
+1. **重新加载插件**——把下面这段话发给 agent(或按上方「安装」步骤手动执行):
+
+   > 请重新加载 time_line_mind 思维导图插件:读取本工作区 `time_line_mind/src/host.js` 与 `time_line_mind/src/client.js` 的内容,分别作为 `cordis_define` 的 `code.host` 与 `code.client`(kind: `new`, idPrefix: `mindm`),然后 `cordis_run` 激活。
+
+2. **刷新浏览器页面**,从会话标题栏右侧 **🧠 按钮** 或对话流 Cordis 激活卡片打开编辑器。
+
+> 提示:如果重启后打开的会话工作区不是本项目的上一级目录,先把会话工作区切到包含 `time_line_mind/` 的目录,或直接用 GitHub 上 [`src/host.js`](src/host.js) / [`src/client.js`](src/client.js) 的源码内容。
+
 ## 数据格式
 
 ```json
