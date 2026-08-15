@@ -27,7 +27,27 @@
 
 详细说明见 [`docs/mindmap-plugin.md`](docs/mindmap-plugin.md)。
 
-## 重启后恢复(重要)
+## 自动重载(推荐)
+
+动态插件定义存在 DSH 进程内存,DSH 重启即清空——这是设计特性。项目附带一个**自动重载器组合插件**(`autoload/`):DSH 每次启动时,它会自动为新会话 `define + run` 本插件,**你不再需要手动粘贴源码**。
+
+安装(一次性,需要 dsh CLI 或 DSH 源码 checkout):
+
+```sh
+# 在 DSH 源码 checkout 目录,或已安装 dsh CLI 的环境:
+pnpm dsh plugin --profile web add ./time_line_mind/autoload
+# 或:dsh plugin --profile web add ./time_line_mind/autoload
+```
+
+安装后**重启 DSH** 生效。之后每次启动:
+
+1. 打开 Web 界面,会话创建时自动重载器会恢复插件;
+2. 对话流出现 Cordis 审批卡片,点一次 **✓ 批准**(每次重启只需这一步,因为审批状态也在内存中);
+3. 刷新页面,从标题栏 **🧠 按钮** 打开编辑器;图档数据从工作区 `mindmap-docs.json` 自动读回。
+
+> 自动重载器只恢复**用户主会话**(跳过子代理会话),每个会话独立一份插件实例。卸载:`pnpm dsh plugin --profile web remove time-line-mind-autoload`。
+
+## 手动恢复(兜底)
 
 动态插件的**代码定义存在 DSH 进程内存**里,DSH 重启后定义会被清空——这是动态插件的设计特性,不是故障。**你的数据不会丢**:图档数据已落盘在工作区 `mindmap-docs.json`,重新加载插件后会自动读回。
 
@@ -79,6 +99,9 @@
 src/
   host.js     插件 Host 半区(内存存储/落盘/导出/诊断工具)
   client.js   插件 Client 半区(编辑器 UI:网络/时间轴/多图档/网络团/导入导出)
+autoload/
+  index.js    自动重载器组合插件(由 build.js 从 src/ 生成,内联源码)
+  build.js    重新生成 autoload/index.js 的脚本
 docs/
   mindmap-plugin.md  完整文档与踩坑记录
 ```

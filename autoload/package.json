@@ -1,0 +1,14 @@
+{
+  "name": "time-line-mind-autoload",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "files": ["index.js", "cordis.patch.yml"],
+  "description": "DSH 组合插件:每次启动时自动重新加载 time_line_mind 动态插件",
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

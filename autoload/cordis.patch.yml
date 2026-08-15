@@ -1,0 +1,8 @@
+# time_line_mind 自动重载器 —— 本 bundle 贡献的插件行。
+# 安装(在 DSH 源码 checkout 或已装 dsh CLI 的环境):
+#   dsh plugin --profile web add ./autoload
+# 或从源码 checkout:
+#   pnpm dsh plugin --profile web add ./autoload
+- insert:
+    - id: time-line-mind-autoload
+      name: time-line-mind-autoload
