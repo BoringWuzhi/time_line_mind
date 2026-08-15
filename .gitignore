@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.DS_Store
+mindmap-docs.json
+mindmap-export-*.json
+mindmap-export-*.svg

@@ -1,0 +1,25 @@
+{
+  "name": "time_line_mind",
+  "version": "1.0.0",
+  "description": "DSH Plugin: 无向图思维导图编辑器(网络图 + 时间轴 + 多图档 + 网络团) for DeepSeek Harness",
+  "type": "module",
+  "private": false,
+  "dsh_plugin": true,
+  "plugin": {
+    "type": "dynamic-cordis",
+    "platform": "host+client",
+    "entrypoints": ["src/host.js", "src/client.js"]
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "mindmap",
+    "timeline",
+    "graph",
+    "network"
+  ],
+  "license": "MIT",
+  "files": ["src", "docs", "README.md", "LICENSE"]
+}
