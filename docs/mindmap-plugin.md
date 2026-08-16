@@ -1,21 +1,22 @@
-# 思维导图 Harness 插件(mindm-1)
+# 思维导图 Harness 插件
 
-动态 Cordis 插件,当前 **pkg-17**。会话标题栏右侧 🧠 按钮打开全屏浮层编辑器。无向图网络 + 时间轴 + 连线命名 + 多选/网络团 + **多图档/雾团/导入导出**。
+静态组件插件(推荐) + 旧动态插件兜底。会话侧边栏底部/标题栏右侧 🧠 按钮打开全屏浮层编辑器。无向图网络 + 时间轴 + 连线命名 + 多选/网络团 + **多图档/雾团/导入导出/AI 导入**。
 
 ## 架构
 
 ```
 Host 半区(DSH Node 进程)
+├─ /mindmap RPC channel               静态组件 Host RPC(原 harness.handle 迁移)
 ├─ mindmap/load | save | reset          多图档存储(按 sessionId)
 ├─ mindmap/doc/create|delete|duplicate|import  图档 CRUD + 导入
+├─ mindmap/ai-parse                     LLM 推理抽取时间线/关系/分组
 ├─ mindmap/export-data|export-image     导出 JSON / SVG 到工作区
 ├─ persist(): 落盘 mindmap-docs.json(布局含固定团)
-├─ normalizeGraph                       阶段一工具规范化
-└─ mindmap_diag                         浏览器端诊断工具
-        ▲ host.call(Client → Host)
+└─ normalizeGraph                       阶段一工具规范化
+        ▲ ctx.connection.rpc.call('/mindmap', ...)(Client → Host)
         │
 Client 半区(浏览器)
-├─ tool.view.cordis                    激活卡片
+├─ sidebar.footer.action              侧边栏底部 🧠 入口(静态组件常驻)
 ├─ conversation.session.header.actions 会话标题栏 🧠 按钮
 ├─ shell.overlay                       全屏浮层面板
 │   ├─ 左侧:图像列表(多图档)
@@ -23,6 +24,20 @@ Client 半区(浏览器)
 │   └─ 右侧:网络团面板
 └─ MindmapEditor 支持 readOnly(阶段一复用)
 ```
+
+## 安装(组件式插件,推荐)
+
+```sh
+# 在 DSH 源码 checkout 目录,或已安装 dsh CLI 的环境:
+pnpm dsh plugin --profile web add ./time_line_mind/component
+# 或:dsh plugin --profile web add ./time_line_mind/component
+```
+
+- 安装后重启 DSH,插件作为静态 Web 组件常驻,新开会话侧边栏底部都有 🧠 入口。
+- 不再需要动态 Cordis 审批,也不会在对话流底部出现动态插件带来的文件选择/审批按钮。
+- 重新生成静态组件包装:`node component/build.js`。
+
+旧动态插件/autoload 仍保留在 `autoload/`,仅作兜底。
 
 ## 数据格式(统一规范)
 
@@ -67,12 +82,19 @@ Client 半区(浏览器)
 
 ### 多图档(左侧)
 - 新建 / 删除 / 重命名 / 复制 / 切换;布局(含固定团)自动落盘;
-- 导入:选择 JSON 数据文件 → 作为新图像载入(可分享给他人)。
+- 导入:选择 JSON 图档 → 作为新图像载入(可分享给他人)。
 
 ### 工具栏右侧
 - **保存**:当前图像落盘;
 - **导出**:弹框选 数据(JSON)或 图像(SVG),写入工作区;
-- **导入**:选择导出的 JSON 文件载入。
+- **导入**:
+  - 选择导出的 JSON 图档原样载入;
+  - 选择 Markdown / 纯文本(`.md` / `.markdown` / `.txt`)时,插件自动梳理:
+    - **时间线**:识别 `2024-01-01`、`2024/1/1`、`2024年1月1日` 等日期前缀的行/标题,生成带 `time` 且标题含日期前缀的节点;
+    - **关系**:识别 `A 与 B 合作`、`A 认识 B`、`A -> B` 等关系行,生成节点与带关系名的连线;
+    - **章节网络团**:Markdown 标题作为章节,自动生成标题节点,并把该标题下的时间节点/实体节点归入同名网络团;
+    - 若事件行同时含关系(如 `2024-01-01 A 与 B 合作`),还会用「涉及」连线把时间节点连到相关实体;
+  - **AI导入**:选择文件后调用 Host 端 `mindmap/ai-parse` 让模型先阅读全文，再分析**人物关系、事件关系、时间关系、组织/概念关系**，输出符合插件数据格式的节点/边/分组；模型不可用或输出无法解析时自动回退到上面的规则解析。依赖 DSH 的 `ctx.llm` 服务(优先使用 `ctx.agentDefaultModel` 当前模型)。
 
 ## 阶段一接入指南(对话流渲染)
 
@@ -103,7 +125,7 @@ Client 半区(浏览器)
 ## 踩坑记录(重要)
 
 1. **defineTool**:parameters.additionalProperties true/省略;output { schema, render };execute 在 defineTool 内;output.schema.additionalProperties 显式。
-2. **sidebar.footer.action 被 CordisPanel 独占**(width:100%;flex:none),入口放 `conversation.session.header.actions`。
+2. **sidebar.footer.action 是 list 槽位**:CordisPanel 与我们的 🧠 入口可同时存在;组件式安装后侧边栏底部入口常驻。
 3. **动态插件定义进程内存级**:DSH 重启即丢定义,需重新 define+run;文档数据会从 `mindmap-docs.json` 恢复(若 fs 可用)。
    - **自动恢复**:项目 `autoload/` 组合插件在 DSH 每次启动时自动 `define+run` 本插件,**进程级单实例**——整个进程只恢复一个实例(挂在第一个出现的用户会话下),不随会话数量重复;图档数据在 host 侧按 `'default'` key 全局共享。安装:
      `pnpm dsh plugin --profile web add ./time_line_mind/autoload`(需 dsh CLI 或源码 checkout)。
@@ -118,8 +140,11 @@ Client 半区(浏览器)
 
 ## 生命周期
 
-| 操作 | 工具 |
+| 操作 | 方式 |
 |---|---|
-| 更新代码 | `cordis_define`(existing, 追加 Package)→ `cordis_run`(update) |
-| 临时停用 | `cordis_stop` |
-| 彻底删除 | `cordis_undefine` |
+| 组件式安装 | `dsh plugin --profile web add ./time_line_mind/component` |
+| 更新组件代码 | 修改 `src/` 后运行 `node component/build.js`,再重启 DSH |
+| 卸载组件 | `dsh plugin --profile web remove time-line-mind` |
+| 旧动态插件更新 | `cordis_define`(existing, 追加 Package)→ `cordis_run`(update) |
+| 旧动态插件停用 | `cordis_stop` |
+| 旧动态插件删除 | `cordis_undefine` |

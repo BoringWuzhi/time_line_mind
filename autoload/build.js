@@ -12,8 +12,9 @@ const client = readFileSync(join(root, 'src', 'client.js'), 'utf8')
 const template = readFileSync(join(here, 'index.template.js'), 'utf8')
 
 const out = template
-  .replace('__HOST_SOURCE__', JSON.stringify(host))
-  .replace('__CLIENT_SOURCE__', JSON.stringify(client))
+  // 使用函数形式替换,避免源码中的 `$'`、`$&` 等被 String.replace 当作特殊替换模式。
+  .replace('__HOST_SOURCE__', () => JSON.stringify(host))
+  .replace('__CLIENT_SOURCE__', () => JSON.stringify(client))
 
 writeFileSync(join(here, 'index.js'), out)
 console.log(`autoload/index.js generated (${out.length} bytes)`)

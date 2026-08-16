@@ -13,51 +13,53 @@
 - **网络团**:把一组节点命名成"团",右侧面板管理;支持**固定**(团作为整体移动、复位布局保持团内相对位置)
 - **多图档**:左侧图像列表,新建/删除/重命名/复制/切换;布局(含固定团)自动落盘
 - **雾团浏览**:缩小时按连通块折叠为雾团(名称:时间节点 → 网络团 → 雾团N)
-- **保存 / 导出 / 导入**:保存到本地;导出数据(JSON,含布局)或图像(SVG);导入数据文件(可分享)
+- **保存 / 导出 / 导入**:保存到本地;导出数据(JSON,含布局)或图像(SVG);导入 JSON 图档,或直接导入 Markdown/纯文本由插件自动梳理时间线、关系与章节网络团;支持 **AI 导入**用模型推理智能抽取,失败自动回退规则解析
 - **语义缩放**:以鼠标为中心缩放;复位视图可居中选中或适配全部
 
-## 安装
+## 安装(组件式插件,推荐)
 
-这是一个 **DSH 动态 Cordis 插件**(进程级),通过 `cordis_define` 加载:
-
-1. 在 DSH 会话中调用 `cordis_define`(kind: `new`, idPrefix 建议 `mindm`);
-2. `code.host` 填入 [`src/host.js`](src/host.js) 的内容;
-3. `code.client` 填入 [`src/client.js`](src/client.js) 的内容;
-4. `cordis_run` 激活并授权,刷新页面后从**会话标题栏右侧 🧠 按钮**或对话流 Cordis 激活卡片打开编辑器。
-
-详细说明见 [`docs/mindmap-plugin.md`](docs/mindmap-plugin.md)。
-
-## 自动重载(推荐)
-
-动态插件定义存在 DSH 进程内存,DSH 重启即清空——这是设计特性。项目附带一个**自动重载器组合插件**(`autoload/`):DSH 每次启动时,它会自动为新会话 `define + run` 本插件,**你不再需要手动粘贴源码**。
-
-安装(一次性,需要 dsh CLI 或 DSH 源码 checkout):
+现在推荐以**静态组件插件**方式安装到 Web profile,这样不依赖动态 Cordis 运行器,新开会话也能在侧边栏稳定找到入口,也不会在对话流底部出现动态插件相关的文件选择/审批按钮。
 
 ```sh
 # 在 DSH 源码 checkout 目录,或已安装 dsh CLI 的环境:
-pnpm dsh plugin --profile web add ./time_line_mind/autoload
-# 或:dsh plugin --profile web add ./time_line_mind/autoload
+pnpm dsh plugin --profile web add ./time_line_mind/component
+# 或:dsh plugin --profile web add ./time_line_mind/component
 ```
 
-安装后**重启 DSH** 生效。之后每次启动:
+安装后**重启 DSH** 生效。之后:
 
-1. 打开 Web 界面,会话创建时自动重载器会恢复插件;
-2. 对话流出现 Cordis 审批卡片,点一次 **✓ 批准**(每次重启只需这一步,因为审批状态也在内存中);
-3. 刷新页面,从标题栏 **🧠 按钮** 打开编辑器;图档数据从工作区 `mindmap-docs.json` 自动读回。
+- 侧边栏底部会出现 🧠 入口;
+- 会话标题栏右侧仍保留 🧠 快捷入口;
+- 图档数据由 Host 半区通过 `/mindmap` RPC 通道读写,落盘仍在工作区 `mindmap-docs.json`;
+- AI 导入继续可用。
 
-> 自动重载器是**进程级单实例**:整个 DSH 进程只恢复一个实例(挂在第一个出现的用户会话下),图档数据在 host 侧全局共享、UI 全局可用——不随会话数量重复。卸载:`pnpm dsh plugin --profile web remove time-line-mind-autoload`。
+> 组件式插件是常驻 Web 组合的一部分,不再需要每次重启后审批动态插件。
+> 如果之前安装过旧的 `time-line-mind-autoload`,请先卸载它,避免动态插件和静态组件同时出现:
+> ```sh
+> pnpm dsh plugin --profile web remove time-line-mind-autoload
+> ```
 
-## 手动恢复(兜底)
+## 旧版动态插件 / 自动重载(不推荐)
+
+如果仍想使用旧的动态插件方式,项目保留了 `autoload/`:
+
+```sh
+pnpm dsh plugin --profile web add ./time_line_mind/autoload
+```
+
+安装后每次启动仍需在对话流审批一次,并且新开会话时入口可能不稳定。建议优先使用上面的 `component/` 静态组件插件。
+
+## 手动恢复(兜底,仅旧动态插件)
 
 动态插件的**代码定义存在 DSH 进程内存**里,DSH 重启后定义会被清空——这是动态插件的设计特性,不是故障。**你的数据不会丢**:图档数据已落盘在工作区 `mindmap-docs.json`,重新加载插件后会自动读回。
 
 重启后恢复只需两步:
 
-1. **重新加载插件**——把下面这段话发给 agent(或按上方「安装」步骤手动执行):
+1. **重新加载插件**——把下面这段话发给 agent(或按旧动态方式手动执行):
 
    > 请重新加载 time_line_mind 思维导图插件:读取本工作区 `time_line_mind/src/host.js` 与 `time_line_mind/src/client.js` 的内容,分别作为 `cordis_define` 的 `code.host` 与 `code.client`(kind: `new`, idPrefix: `mindm`),然后 `cordis_run` 激活。
 
-2. **刷新浏览器页面**,从会话标题栏右侧 **🧠 按钮** 或对话流 Cordis 激活卡片打开编辑器。
+2. **刷新浏览器页面**,从会话标题栏右侧 **🧠 按钮** 打开编辑器。
 
 > 提示:如果重启后打开的会话工作区不是本项目的上一级目录,先把会话工作区切到包含 `time_line_mind/` 的目录,或直接用 GitHub 上 [`src/host.js`](src/host.js) / [`src/client.js`](src/client.js) 的源码内容。
 
@@ -91,16 +93,22 @@ pnpm dsh plugin --profile web add ./time_line_mind/autoload
 | 多选/框选 | Ctrl+单击 / Ctrl+拖框;拖任一选中节点整组平移 |
 | 网络团 | 多选后右键「命名网络团」;右侧面板:固定/松开/重命名/删除/双击聚焦 |
 | 雾团 | 缩放 < 0.45 时按连通块折叠,点击聚焦 |
-| 保存/导出/导入 | 工具栏右侧;导出可选 数据(JSON)/图像(SVG) |
+| 保存/导出/导入 | 工具栏右侧;导出可选 数据(JSON)/图像(SVG);「导入」支持 JSON 图档与规则自动梳理,「AI导入」使用模型推理智能抽取 |
 
 ## 结构
 
 ```
 src/
-  host.js     插件 Host 半区(内存存储/落盘/导出/诊断工具)
-  client.js   插件 Client 半区(编辑器 UI:网络/时间轴/多图档/网络团/导入导出)
+  host.js     插件 Host 半区源码(内存存储/落盘/导出/AI 推理)
+  client.js   插件 Client 半区源码(编辑器 UI:网络/时间轴/多图档/网络团/导入导出)
+component/
+  package.json        静态组件插件包(推荐安装)
+  cordis.patch.yml    静态组件插件行
+  build.js            从 src/ 生成 component/src/index.js 与 component/src/client.js
+  src/index.js        Host 半区:把原 handler 挂到 /mindmap RPC channel
+  src/client.js       Client 半区:包装原 UI,并注册侧边栏入口
 autoload/
-  index.js    自动重载器组合插件(由 build.js 从 src/ 生成,内联源码)
+  index.js    旧动态自动重载器(不推荐,由 build.js 生成)
   build.js    重新生成 autoload/index.js 的脚本
 docs/
   mindmap-plugin.md  完整文档与踩坑记录

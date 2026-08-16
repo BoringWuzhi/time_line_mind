@@ -486,6 +486,7 @@ return {
         btn('保存', p.onSave, false, '保存到本地'),
         btn('导出', p.onExport, false, '导出数据或图像'),
         btn('导入', p.onImport, false, '导入数据文件'),
+        btn('AI导入', p.onAiImport, false, '使用模型推理自动梳理时间线与关系(失败时回退规则解析)'),
         React.createElement('span', { className: 'mm-sep' }),
         btn('＋', p.onZoomIn, false, '放大'),
         btn('−', p.onZoomOut, false, '缩小'),
@@ -1460,6 +1461,7 @@ return {
           onSave: () => props.onSave(),
           onExport: () => props.onExport(),
           onImport: () => props.onImport(),
+          onAiImport: () => props.onAiImport(),
           onZoomIn: () => zoom(1.25),
           onZoomOut: () => zoom(0.8),
         }),
@@ -1582,6 +1584,197 @@ return {
       return Math.abs(h)
     }
     const PALETTE = ['#e05252', '#4f8ef7', '#2fb36b', '#f0a03a', '#9b59b6', '#16a085', '#e67e22', '#3498db', '#c0392b', '#27ae60']
+
+    // ===== 文本导入自动梳理:从 Markdown / 纯文本中提取时间线与关系 =====
+    function cleanImportLine(raw) {
+      let s = String(raw || '').trim()
+      s = s.replace(/^([-+*]|\d+[.)])\s+/, '')
+      s = s.replace(/^\[[ xX]\]\s+/, '')
+      s = s.replace(/^>\s?/, '')
+      s = s.replace(/^#{1,6}\s+/, '')
+      s = s.replace(/[*_`~]+/g, '')
+      return s.trim()
+    }
+
+    function cleanEntity(s) {
+      return String(s || '')
+        .replace(/^[\s:：,，.。!！?？;；'"“”‘’()（）【】\[\]]+|[\s:：,，.。!！?？;；'"“”‘’()（）【】\[\]]+$/g, '')
+        .trim()
+    }
+
+    function parseDatePrefix(s) {
+      const m = String(s || '').match(/^(\d{4})\s*[-\/.年]\s*(\d{1,2})\s*[-\/.月]\s*(\d{1,2})\s*日?(?:\s+(\d{1,2})[:：](\d{2}))?/)
+      if (!m) return null
+      const y = parseInt(m[1], 10)
+      const mo = parseInt(m[2], 10)
+      const d = parseInt(m[3], 10)
+      const hh = m[4] ? parseInt(m[4], 10) : 0
+      const mm = m[5] ? parseInt(m[5], 10) : 0
+      const date = new Date(y, mo - 1, d, hh, mm)
+      if (isNaN(date.getTime())) return null
+      return { time: date.getTime(), dateText: m[0].trim(), rest: String(s).slice(m[0].length).trim() }
+    }
+
+    function titleForTimeline(dateText, rest) {
+      const t = cleanImportLine(rest).replace(/^[-:：|,，、]+/, '').trim()
+      return t ? dateText + ' ' + t : dateText
+    }
+
+    const RELATION_WORDS = '认识|合作|相关|有关|关联|连接|依赖|影响|属于|包含|包括|支持|反对|导致|引发|推动|阻止|喜欢|讨厌|朋友|同事|师生|父子|母子'
+    const RELATION_WITH_PARTNER = new RegExp('^(.{1,30}?)\\s*(?:与|和|跟)\\s*(.{1,30}?)\\s*(?:是|为|成为)?\\s*(' + RELATION_WORDS + ')\\s*$')
+    const RELATION_DIRECT = new RegExp('^(.{1,30}?)\\s*(' + RELATION_WORDS + ')\\s*(.{1,30}?)\\s*$')
+    const ARROW_RE = /^(.{1,40}?)\s*(->|→|=>|⇒|--|—|～)\s*(.{1,40}?)\s*$/
+
+    function parseRelationLine(s) {
+      const line = String(s || '').trim()
+      if (!line || line.length > 120) return null
+      let m = line.match(RELATION_WITH_PARTNER)
+      if (m) {
+        const a = cleanEntity(m[1])
+        const b = cleanEntity(m[2])
+        const rel = m[3]
+        if (a && b && a !== b && a.length <= 40 && b.length <= 40) return { a, b, rel }
+      }
+      m = line.match(ARROW_RE)
+      if (m) {
+        const a = cleanEntity(m[1])
+        const b = cleanEntity(m[3])
+        const rel = m[2]
+        if (a && b && a !== b && a.length <= 40 && b.length <= 40) return { a, b, rel }
+      }
+      m = line.match(RELATION_DIRECT)
+      if (m) {
+        const a = cleanEntity(m[1])
+        const b = cleanEntity(m[3])
+        const rel = m[2]
+        if (a && b && a !== b && a.length <= 40 && b.length <= 40) return { a, b, rel }
+      }
+      return null
+    }
+
+    function parseTextToGraph(text, fileName) {
+      const nodes = []
+      const edges = []
+      const groups = []
+      const nodeByTitle = new Map()
+      const groupByName = new Map()
+      let currentSection = null
+
+      const ensureNode = (title, opts) => {
+        const t = cleanEntity(title)
+        if (!t || t.length > 60) return null
+        const key = t.toLowerCase()
+        const existingId = nodeByTitle.get(key)
+        if (existingId) {
+          const existing = nodes.find((n) => n.id === existingId)
+          if (existing && opts && opts.time !== undefined) {
+            if (existing.time !== undefined && existing.time !== opts.time) {
+              const id = genId()
+              nodes.push({
+                id,
+                title: (opts.dateText ? opts.dateText + ' ' : '') + t,
+                time: opts.time,
+              })
+              return id
+            }
+            if (existing.time === undefined) {
+              existing.time = opts.time
+              if (opts.dateText) existing.title = t
+            }
+          }
+          return existingId
+        }
+        const id = genId()
+        const node = { id, title: t }
+        if (opts && opts.time !== undefined) node.time = opts.time
+        nodes.push(node)
+        nodeByTitle.set(key, id)
+        return id
+      }
+
+      const ensureGroup = (name) => {
+        const key = String(name || '').trim()
+        if (!key) return null
+        let g = groupByName.get(key)
+        if (!g) {
+          g = { id: genId(), name: key, nodeIds: [], pinned: false }
+          groups.push(g)
+          groupByName.set(key, g)
+        }
+        return g
+      }
+
+      const addToGroup = (groupName, nodeId) => {
+        const g = ensureGroup(groupName)
+        if (g && nodeId && !g.nodeIds.includes(nodeId)) g.nodeIds.push(nodeId)
+      }
+
+      const addEdge = (a, b, title) => {
+        if (!a || !b || a === b) return
+        const exists = edges.some((e) =>
+          (e.source === a && e.target === b) || (e.source === b && e.target === a))
+        if (!exists) edges.push({ source: a, target: b, title: title || '关联' })
+      }
+
+      const addRelation = (a, b, rel) => {
+        const ia = ensureNode(a)
+        const ib = ensureNode(b)
+        if (!ia || !ib || ia === ib) return
+        addEdge(ia, ib, rel)
+        if (currentSection) {
+          addToGroup(currentSection, ia)
+          addToGroup(currentSection, ib)
+        }
+      }
+
+      const lines = String(text || '').split(/\r?\n/)
+      for (const raw of lines) {
+        const trimmedRaw = raw.trim()
+        if (!trimmedRaw || /^(---+|\*\*\*+|___+)$/.test(trimmedRaw)) continue
+        const headingMatch = trimmedRaw.match(/^#{1,6}\s+(.*)$/)
+        const line = cleanImportLine(raw)
+        if (!line) continue
+
+        const dp = parseDatePrefix(line)
+        if (dp) {
+          const title = titleForTimeline(dp.dateText, dp.rest)
+          const id = genId()
+          nodes.push({ id, title, time: dp.time })
+          if (currentSection) addToGroup(currentSection, id)
+          const rel = parseRelationLine(dp.rest)
+          if (rel) {
+            addRelation(rel.a, rel.b, rel.rel)
+            addEdge(id, ensureNode(rel.a), '涉及')
+            addEdge(id, ensureNode(rel.b), '涉及')
+          }
+          continue
+        }
+
+        if (headingMatch) {
+          const headingText = cleanImportLine(headingMatch[1])
+          if (headingText) {
+            currentSection = headingText
+            const hid = ensureNode(headingText)
+            if (hid) addToGroup(currentSection, hid)
+          }
+          continue
+        }
+
+        const rel = parseRelationLine(line)
+        if (rel) addRelation(rel.a, rel.b, rel.rel)
+      }
+
+      const timed = nodes.filter((n) => n.time !== undefined).length
+      if (nodes.length === 0) {
+        return { ok: false, error: '未能从文件中识别到时间线、关系或标题节点' }
+      }
+      const finalGroups = groups.filter((g) => g.nodeIds.length > 0)
+      return {
+        ok: true,
+        graph: { nodes, edges, groups: finalGroups },
+        stats: { nodes: nodes.length, timed, edges: edges.length, groups: finalGroups.length },
+      }
+    }
 
     function CordisActivationCard(props) {
       const p = props || {}
@@ -1710,14 +1903,37 @@ return {
           downloadBlob(blob, base + '.svg')
         }
       }
-      const pickImportFile = () => {
+      const finishImport = (name, graph, layout) => {
+        host.call('mindmap/doc/import', { name, graph, layout }).then((res) => {
+          if (res && res.docId) {
+            setDocs((prev) => {
+              const nd = { id: res.docId, name, graph, layout }
+              const next = [...prev, nd]
+              setCurrentId(res.docId)
+              return next
+            })
+          }
+        }).catch((err) => console.error('import failed', err))
+      }
+
+      const finishTextImport = (text, fileName) => {
+        const parsed = parseTextToGraph(text, fileName)
+        if (!parsed.ok) {
+          console.error('text import parse failed', parsed && parsed.error)
+          return
+        }
+        const baseName = (fileName || '导入图像').replace(/\.(json|md|markdown|txt)$/i, '')
+        finishImport(baseName || '导入图像', parsed.graph, null)
+      }
+
+      const pickImportFile = (mode) => {
         try {
           const input = document.createElement('input')
           input.type = 'file'
-          input.accept = '.json,application/json'
+          input.accept = '.json,.md,.markdown,.txt,application/json,text/plain,text/markdown'
           input.onchange = () => {
             const file = input.files && input.files[0]
-            if (file) importFile(file)
+            if (file) importFile(file, mode)
             input.remove()
           }
           document.body.appendChild(input)
@@ -1726,36 +1942,52 @@ return {
           console.error('file picker unavailable', err)
         }
       }
-      // 导入:兼容 { graph } 包装 / 直接 graph,并恢复 layout(固定团布局)
-      const importFile = (file) => {
+
+      // 导入:
+      // 1) JSON 图档原样载入(兼容 { graph } 包装 / 直接 graph,并恢复 layout);
+      // 2) Markdown / 纯文本自动梳理时间线、关系、章节网络团;
+      // 3) AI 导入:优先调用 Host 端模型推理,失败时回退到规则解析。
+      const importFile = (file, mode) => {
         const reader = new FileReader()
         reader.onload = () => {
-          try {
-            const data = JSON.parse(String(reader.result))
-            let graph = data
-            let layout = null
-            if (graph && graph.graph && Array.isArray(graph.graph.nodes)) {
-              layout = graph.layout && typeof graph.layout === 'object' ? graph.layout : null
-              graph = graph.graph
-            }
-            if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
-              console.error('invalid import data')
-              return
-            }
-            const name = (data && data.name) || (file.name || '导入图像').replace(/\.json$/i, '') || '导入图像'
-            host.call('mindmap/doc/import', { name, graph, layout }).then((res) => {
-              if (res && res.docId) {
-                setDocs((prev) => {
-                  const nd = { id: res.docId, name, graph, layout }
-                  const next = [...prev, nd]
-                  setCurrentId(res.docId)
-                  return next
-                })
+          const text = String(reader.result || '')
+          const trimmed = text.trim()
+          const fileName = file && file.name ? file.name : ''
+          const isJsonFile = /\.json$/i.test(fileName) || trimmed.startsWith('{') || trimmed.startsWith('[')
+          if (isJsonFile) {
+            try {
+              const data = JSON.parse(trimmed)
+              let graph = data
+              let layout = null
+              if (graph && graph.graph && Array.isArray(graph.graph.nodes)) {
+                layout = graph.layout && typeof graph.layout === 'object' ? graph.layout : null
+                graph = graph.graph
               }
-            }).catch((err) => console.error('import failed', err))
-          } catch (err2) {
-            console.error('import parse failed', err2)
+              if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
+                const name = (data && data.name) || (fileName || '导入图像').replace(/\.json$/i, '') || '导入图像'
+                finishImport(name, graph, layout)
+                return
+              }
+            } catch (errJson) {
+              // 不是 JSON 图档,继续按文本解析
+            }
           }
+          if (mode === 'ai') {
+            host.call('mindmap/ai-parse', { text, fileName }).then((res) => {
+              if (res && res.ok && res.graph) {
+                const baseName = (fileName || '导入图像').replace(/\.(json|md|markdown|txt)$/i, '')
+                finishImport(baseName || '导入图像', res.graph, null)
+              } else {
+                console.warn('AI parse failed, fallback to rule parser', res)
+                finishTextImport(text, fileName)
+              }
+            }).catch((err) => {
+              console.warn('AI parse error, fallback to rule parser', err)
+              finishTextImport(text, fileName)
+            })
+            return
+          }
+          finishTextImport(text, fileName)
         }
         reader.readAsText(file)
       }
@@ -1808,6 +2040,7 @@ return {
                 onSave: saveNow,
                 onExport: () => setExportModal(true),
                 onImport: pickImportFile,
+                onAiImport: () => pickImportFile('ai'),
               }),
             ),
             exportModal
@@ -1856,15 +2089,43 @@ return {
       }
     }
 
-    slots.inject('tool.view.cordis', () => slots.register(
-      { name: 'tool.view.cordis', key: 'self' },
-      (props) => React.createElement(CordisActivationCard, props || {}),
-    ))
+    function MindmapSidebarAction(props) {
+      const p = props || {}
+      try {
+        return React.createElement('button', {
+          className: 'mm-hbtn',
+          title: '思维导图',
+          'aria-label': '打开思维导图编辑器',
+          onClick: () => store.setOpen(!store.open),
+          style: p.wide ? undefined : { width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        }, '🧠')
+      } catch (err) {
+        return crashView(err, '🧠 侧边栏按钮渲染失败')
+      }
+    }
+
+    // 静态组件模式不再注册动态 Cordis 激活卡片,避免对话流底部出现多余按钮。
+    if (typeof globalThis.__TIME_LINE_MIND_STATIC__ === 'undefined' || !globalThis.__TIME_LINE_MIND_STATIC__) {
+      slots.inject('tool.view.cordis', () => slots.register(
+        { name: 'tool.view.cordis', key: 'self' },
+        (props) => React.createElement(CordisActivationCard, props || {}),
+      ))
+    }
 
     slots.inject('conversation.session.header.actions', () => slots.register(
       { name: 'conversation.session.header.actions', id: 'mindmap.open', order: 30, label: '思维导图' },
       (props) => React.createElement(MindmapButton, props || {}),
     ))
+
+    // 侧边栏底部入口:静态组件模式下新会话也能稳定找到编辑器。
+    try {
+      slots.inject('sidebar.footer.action', () => slots.register(
+        { name: 'sidebar.footer.action', id: 'mindmap.open', order: 10, label: '思维导图' },
+        (props) => React.createElement(MindmapSidebarAction, props || {}),
+      ))
+    } catch (err) {
+      console.warn('[time_line_mind] sidebar.footer.action slot unavailable', err)
+    }
 
     slots.inject('shell.overlay', () => slots.register(
       { name: 'shell.overlay', id: 'mindmap.overlay', order: 20, label: '思维导图' },
