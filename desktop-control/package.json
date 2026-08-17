@@ -1,0 +1,12 @@
+{
+  "name": "harness-desktop-control",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone DeepSeek Harness desktop controller (start / stop / restart)",
+  "scripts": {
+    "start": "python harness_control.py",
+    "start:hidden": "pythonw harness_control.py",
+    "install:shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File ./install_desktop_shortcut.ps1"
+  },
+  "license": "MIT"
+}

@@ -114,6 +114,21 @@ docs/
   mindmap-plugin.md  完整文档与踩坑记录
 ```
 
+## 桌面控制伴侣（desktop-control）
+
+仓库还附带一个独立运行的 **Harness 桌面控制器**（`desktop-control/`），用于在 Windows 桌面启动 / 关闭 / 重启 Harness：
+
+- 不依赖 Harness 本身，可从桌面图标直接打开
+- 窗口会出现在任务栏，可固定到任务栏
+- 界面提供「启动 Harness」「关闭 Harness」「重启 Harness」三个操作
+
+```powershell
+cd desktop-control
+powershell -ExecutionPolicy Bypass -File .\install_desktop_shortcut.ps1
+```
+
+快速开始见 [`desktop-control/README.md`](desktop-control/README.md)，完整说明书见 [`desktop-control/说明书.md`](desktop-control/说明书.md)。
+
 ## License
 
 [MIT](LICENSE)

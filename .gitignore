@@ -4,3 +4,9 @@ node_modules/
 mindmap-docs.json
 mindmap-export-*.json
 mindmap-export-*.svg
+
+# Python desktop control
+__pycache__/
+*.py[cod]
+desktop-control/state/
+desktop-control/state/*
