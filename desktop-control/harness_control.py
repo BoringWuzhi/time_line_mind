@@ -276,8 +276,8 @@ class HarnessControlApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title(f"{NAME} 桌面控制器")
-        self.root.geometry("640x520")
-        self.root.minsize(560, 440)
+        self.root.geometry("760x600")
+        self.root.minsize(640, 520)
         # 任务栏图标分组（Windows）
         try:
             import ctypes
@@ -364,186 +364,172 @@ class HarnessControlApp:
         canvas.create_line(cx, cy, cx, cy + s * 0.3, fill=dark, width=1)
 
     def _build_ui(self) -> None:
-        # ── 和风设计系统：和纸白 / 绀青 / 洗朱 / 抹茶绿 / 山吹茶 / 墨染 ──
+        # ── 和风设计系统：来自 style guide 的变量 ──
         PAPER = "#F5F0E8"
-        SUMI = "#2B2825"
         KON = "#1A2A3A"
-        BENI = "#BC5A3E"
+        SHUJU = "#BC5A3E"
         MATCHA = "#8BA788"
         YAMABUKI = "#C59B5B"
-        LINE = "#C9BFAE"
+        SUMI = "#2B2825"
+        TEXT_SECONDARY = "#5A4E45"
+        CARD_BG = "#FFFCF8"
+        LINE = "#E3D5C5"
         FONT = ("Yu Gothic UI", 10)
-        FONT_TITLE = ("Yu Gothic UI", 15, "bold")
+        FONT_TITLE = ("Yu Gothic UI", 20)
         FONT_MONO = ("MS Gothic", 9)
 
         self.root.configure(bg=PAPER)
         container = tk.Frame(self.root, bg=PAPER)
         container.pack(fill=tk.BOTH, expand=True)
 
-        # ── 顶部装饰：砂子纹理 + 破墨线 + 淡红日 + 竹 + 枫叶 ──
-        top = tk.Canvas(container, height=118, bg=PAPER, highlightthickness=0)
-        top.pack(fill=tk.X)
-        self._draw_washi_texture(top, 640, 118, count=110)
-        # 破墨横线：穿过约 1/3 处，线端渐隐
-        self._draw_break_line(top, 92, 48, 260, YAMABUKI)
-        # 淡红日（低饱和）
-        top.create_oval(512, 8, 610, 106, fill="#E7C9B8", outline="")
-        # 竹（抹茶绿）
-        self._draw_bamboo(top, 34, 118, 86, MATCHA, "#6F856B")
-        self._draw_bamboo(top, 56, 118, 100, "#9BB494", "#7C9276")
-        # 枫叶（洗朱/山吹）
-        self._draw_maple_leaf(top, 502, 44, 24, BENI, "#9A4630")
-        self._draw_maple_leaf(top, 566, 84, 18, "#C9825B", "#9C6446")
-        self._draw_maple_leaf(top, 438, 76, 14, YAMABUKI, "#8F6A3E")
-        # 日式文字
-        top.create_text(600, 16, text="和", fill=SUMI, font=("Yu Gothic UI", 14, "bold"), anchor="ne")
+        # ── 顶部导航栏：屏风式 / 极简 ──
+        navbar = tk.Frame(container, bg=PAPER)
+        navbar.pack(fill=tk.X, padx=48, pady=(28, 8))
 
-        # ── 主体：左侧竹帘 / 茣蓙目 + 右侧内容 ──
-        body = tk.Frame(container, bg=PAPER)
-        body.pack(fill=tk.BOTH, expand=True)
+        logo = tk.Label(navbar, text="和风 · 样式", bg=PAPER, fg=KON,
+                        font=("Yu Gothic UI", 13, "bold"), anchor="w")
+        logo.pack(side=tk.LEFT)
+        logo_sub = tk.Label(navbar, text="桌面控制器", bg=PAPER, fg=SHUJU,
+                            font=("Yu Gothic UI", 9), anchor="w")
+        logo_sub.pack(side=tk.LEFT, padx=(8, 0))
 
-        left = tk.Canvas(body, width=72, bg=PAPER, highlightthickness=0)
-        left.pack(side=tk.LEFT, fill=tk.Y)
-        self._draw_washi_texture(left, 72, 420, count=50)
-        self._draw_bamboo(left, 20, 330, 190, MATCHA, "#6F856B")
-        self._draw_bamboo(left, 44, 350, 230, "#9BB494", "#7C9276")
-        self._draw_maple_leaf(left, 54, 48, 13, BENI, "#9A4630")
-        # 茣蓙目角饰（15% 左右的低可见度）
-        self._draw_ichimatsu(left, 36, 390, 14, "#C9BFAE")
-
-        content = tk.Frame(body, bg=PAPER)
-        content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 28), pady=(0, 18))
-
-        # 蓝染“一文字”分隔线（克制、低饱和）
-        tk.Frame(content, bg=KON, height=2).pack(fill=tk.X, pady=(0, 14))
-
-        header = tk.Frame(content, bg=PAPER)
-        header.pack(fill=tk.X)
-        title = tk.Label(
-            header,
-            text=f"{NAME} 桌面控制器",
-            bg=PAPER,
-            fg=SUMI,
-            font=FONT_TITLE,
-            anchor="w",
-        )
-        title.pack(side=tk.LEFT)
         manual_btn = tk.Button(
-            header,
+            navbar,
             text="说明书",
             command=self.open_manual,
             bg=PAPER,
-            fg=KON,
+            fg=SHUJU,
             activebackground=PAPER,
-            activeforeground=BENI,
+            activeforeground=KON,
             relief="flat",
             bd=0,
             font=("Yu Gothic UI", 9),
             cursor="hand2",
         )
-        manual_btn.pack(side=tk.RIGHT, anchor="e")
+        manual_btn.pack(side=tk.RIGHT)
 
-        subtitle = tk.Label(
-            content,
-            text="H A R N E S S   D E S K T O P   C O N T R O L",
-            bg=PAPER,
-            fg="#8A8278",
-            font=("Yu Gothic UI", 9),
-            anchor="w",
-        )
-        subtitle.pack(fill=tk.X, pady=(2, 18))
+        # ── Hero 区：大量余白 + 中文标题 ──
+        hero = tk.Frame(container, bg=PAPER)
+        hero.pack(fill=tk.X, padx=56, pady=(10, 6))
+        tk.Label(hero, text="—— 静寂之美 ——", bg=PAPER, fg=SHUJU,
+                 font=("Yu Gothic UI", 10), anchor="w").pack(fill=tk.X)
+        tk.Label(hero, text=f"{NAME} 桌面控制器", bg=PAPER, fg=KON,
+                 font=FONT_TITLE, anchor="w").pack(fill=tk.X, pady=(4, 2))
+        tk.Label(hero, text="启动 / 关闭 / 重启 DeepSeek Harness", bg=PAPER,
+                 fg=TEXT_SECONDARY, font=("Yu Gothic UI", 10), anchor="w").pack(fill=tk.X)
+
+        # ── 破墨线 + 少量竹枫点缀 ──
+        deco = tk.Canvas(container, height=64, bg=PAPER, highlightthickness=0)
+        deco.pack(fill=tk.X, padx=48, pady=(14, 4))
+        self._draw_washi_texture(deco, 640, 64, count=45)
+        self._draw_break_line(deco, 32, 0, 240, YAMABUKI)
+        self._draw_bamboo(deco, 530, 64, 48, MATCHA, "#6F856B")
+        self._draw_maple_leaf(deco, 620, 28, 15, SHUJU, "#9A4630")
+
+        # ── 页脚：中文版权 + 茣蓙目纹理（先 pack，保证底部可见） ──
+        footer = tk.Frame(container, bg=PAPER)
+        footer.pack(fill=tk.X, side=tk.BOTTOM, padx=48, pady=(20, 26))
+        tk.Label(footer, text="© 2026 · 和风桌面控制器 · 余白的设计", bg=PAPER,
+                 fg=TEXT_SECONDARY, font=("Yu Gothic UI", 8)).pack(side=tk.LEFT)
+        motif = tk.Canvas(footer, width=80, height=20, bg=PAPER, highlightthickness=0)
+        motif.pack(side=tk.RIGHT)
+        for i in range(4):
+            x = 4 + i * 20
+            motif.create_rectangle(x, 2, x + 14, 16, outline="#2B2825", width=1)
+        for i in range(4):
+            x = 14 + i * 20
+            motif.create_rectangle(x, 2, x + 14, 16, outline="#2B2825", width=1)
+
+        # ── 内容主体：左侧朱砂锚点分节 ──
+        content = tk.Frame(container, bg=PAPER)
+        content.pack(fill=tk.BOTH, expand=True, padx=56, pady=(10, 0))
 
         def make_dot(parent, size=10):
             dot = tk.Canvas(parent, width=size, height=size, bg=PAPER, highlightthickness=0)
-            dot.create_oval(3, 3, size - 3, size - 3, fill=BENI, outline="")
+            dot.create_oval(3, 3, size - 3, size - 3, fill=SHUJU, outline="")
             return dot
 
-        # 状态模块：左侧朱砂锚点
+        # 状态模块
         status_row = tk.Frame(content, bg=PAPER)
-        status_row.pack(fill=tk.X, pady=(0, 14))
-        make_dot(status_row).pack(side=tk.LEFT, padx=(0, 8))
-        tk.Label(
-            status_row,
-            text="状态：",
-            bg=PAPER,
-            fg=SUMI,
-            font=FONT,
-        ).pack(side=tk.LEFT)
+        status_row.pack(fill=tk.X, pady=(0, 24))
+        make_dot(status_row).pack(side=tk.LEFT, padx=(0, 10))
+        tk.Label(status_row, text="状态：", bg=PAPER, fg=SUMI, font=FONT).pack(side=tk.LEFT)
         self.status_var = tk.StringVar(value="检测中…")
-        self.status_label = tk.Label(
-            status_row,
-            textvariable=self.status_var,
-            bg=PAPER,
-            fg=SUMI,
-            font=("Yu Gothic UI", 10, "bold"),
-        )
+        self.status_label = tk.Label(status_row, textvariable=self.status_var, bg=PAPER,
+                                     fg=SUMI, font=("Yu Gothic UI", 10, "bold"))
         self.status_label.pack(side=tk.LEFT)
 
-        def make_button(parent, text, bg, hover_bg, command):
+        # 按钮模块：参考网页的 outline / primary 按钮
+        buttons = tk.Frame(content, bg=PAPER)
+        buttons.pack(fill=tk.X, pady=(0, 28))
+        make_dot(buttons).pack(side=tk.LEFT, padx=(0, 10))
+
+        def make_button(parent, text, style, command):
+            if style == "primary":
+                bg, fg, border, hover_bg, hover_fg = KON, "#F5F0E8", KON, SHUJU, "#FFFFFF"
+            elif style == "shuju":
+                bg, fg, border, hover_bg, hover_fg = PAPER, SHUJU, SHUJU, "#F1E2DB", KON
+            else:
+                bg, fg, border, hover_bg, hover_fg = PAPER, SUMI, SUMI, "#EFE9DF", SHUJU
             btn = tk.Button(
                 parent,
                 text=text,
                 command=command,
                 bg=bg,
-                fg="#F5F0E8",
+                fg=fg,
                 activebackground=hover_bg,
-                activeforeground="#FFFFFF",
+                activeforeground=hover_fg,
                 disabledforeground="#C9BFAE",
                 relief="flat",
                 bd=0,
-                padx=20,
+                highlightthickness=1,
+                highlightbackground=border,
+                highlightcolor=border,
+                padx=24,
                 pady=8,
                 font=FONT,
                 cursor="hand2",
             )
-            # 墨润悬停：进入时缓慢变深，离开时回到原色
             def on_enter(_):
-                btn.configure(bg=hover_bg)
+                if str(btn["state"]) != "disabled":
+                    btn.configure(bg=hover_bg, fg=hover_fg, highlightbackground=hover_bg)
             def on_leave(_):
-                btn.configure(bg=bg)
+                if str(btn["state"]) != "disabled":
+                    btn.configure(bg=bg, fg=fg, highlightbackground=border)
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)
             return btn
 
-        # 按钮模块：左侧朱砂锚点
-        buttons = tk.Frame(content, bg=PAPER)
-        buttons.pack(fill=tk.X, pady=(0, 16))
-        make_dot(buttons).pack(side=tk.LEFT, padx=(0, 8))
-        self.start_btn = make_button(buttons, "启动 Harness", KON, "#24394E", self.on_start)
-        self.start_btn.pack(side=tk.LEFT, padx=(0, 8))
-        self.stop_btn = make_button(buttons, "关闭 Harness", BENI, "#A84A31", self.on_stop)
-        self.stop_btn.pack(side=tk.LEFT, padx=(0, 8))
-        self.restart_btn = make_button(buttons, "重启 Harness", SUMI, "#3D3833", self.on_restart)
+        self.start_btn = make_button(buttons, "启动 Harness", "primary", self.on_start)
+        self.start_btn.pack(side=tk.LEFT, padx=(0, 12))
+        self.stop_btn = make_button(buttons, "关闭 Harness", "shuju", self.on_stop)
+        self.stop_btn.pack(side=tk.LEFT, padx=(0, 12))
+        self.restart_btn = make_button(buttons, "重启 Harness", "normal", self.on_restart)
         self.restart_btn.pack(side=tk.LEFT)
 
-        # 日志模块：朱砂锚点 + 渗纸边框
+        # 日志卡片模块：渗纸卡片
         log_header = tk.Frame(content, bg=PAPER)
-        log_header.pack(fill=tk.X, pady=(0, 6))
-        make_dot(log_header, size=10).pack(side=tk.LEFT, padx=(0, 8))
-        tk.Label(
-            log_header,
-            text="运行日志",
-            bg=PAPER,
-            fg=SUMI,
-            font=("Yu Gothic UI", 9, "bold"),
-        ).pack(side=tk.LEFT)
+        log_header.pack(fill=tk.X, pady=(0, 8))
+        make_dot(log_header, size=10).pack(side=tk.LEFT, padx=(0, 10))
+        tk.Label(log_header, text="运行日志", bg=PAPER, fg=SUMI,
+                 font=("Yu Gothic UI", 10, "bold")).pack(side=tk.LEFT)
 
-        log_frame = tk.Frame(content, bg="#FCF9F2", highlightbackground=LINE, highlightthickness=1)
-        log_frame.pack(fill=tk.BOTH, expand=True)
+        log_card = tk.Frame(content, bg=CARD_BG, highlightbackground=LINE, highlightthickness=1)
+        log_card.pack(fill=tk.BOTH, expand=True)
         self.log_text = scrolledtext.ScrolledText(
-            log_frame,
-            height=10,
+            log_card,
+            height=9,
             state=tk.DISABLED,
             font=FONT_MONO,
-            bg="#FCF9F2",
+            bg=CARD_BG,
             fg=SUMI,
             insertbackground=SUMI,
             relief="flat",
             highlightthickness=0,
-            padx=10,
-            pady=8,
+            padx=14,
+            pady=10,
         )
-        self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.log_text.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
         self.append_log("和风 Harness 控制器已启动。")
         self.append_log(f"配置文件：{CONFIG_PATH}")
